@@ -1053,27 +1053,6 @@ double **av_kl;
     
     av_m2 = (double *) malloc(sizeof(double)*(length+1));  
     
-    int *k_index;
-    int *l_index;
-    double *J_index;
-    
-    
-    int *k_index2;
-    int *l_index2;
-    int *m_index2;
-    double *V_index;    
-    
-    int r,r2;
-    
-    k_index = (int *) malloc(sizeof(int)*((length+1)*(length+1)));
-    l_index = (int *) malloc(sizeof(int)*((length+1)*(length+1)));    
-    J_index = (double *) malloc(sizeof(double)*((length+1)*(length+1)));  
-    
-    k_index2 = (int *) malloc(sizeof(int)*((length+1)*(length+1)*(length+1)));
-    l_index2 = (int *) malloc(sizeof(int)*((length+1)*(length+1)*(length+1)));    
-    m_index2 = (int *) malloc(sizeof(int)*((length+1)*(length+1)*(length+1)));
-    V_index  = (double *) malloc(sizeof(double)*((length+1)*(length+1)*(length+1)));      
-
 
 for (n1 = 1; n1 <= number_mc ; n1 ++) {   
 
@@ -1211,8 +1190,8 @@ if(n1 == 1) {
     };
    };
  
- if(n1%1000 == 0) 
-     
+if(n1%1000 == 0) 
+
  {
 
      std::cout << n1 << " mc-steps " << std::endl; 
@@ -1257,11 +1236,11 @@ std::cout << " Number of accepted steps : h : " << d_a1 << " " << (d_a1) / (((do
 
     for(k=0;k<length;k++) {
         
-      av_m2[k] = 0.0;   
+      av_m3[k] = 0.0;   
         
       for(n=1;n<=q_int;n++) {       
         
-        av_m2[k] += h[k][n];  
+        av_m3[k] += sqrt(pow(h[k][n],2));  
           
         for(l=0;l<length;l++) {
    
@@ -1274,8 +1253,6 @@ std::cout << " Number of accepted steps : h : " << d_a1 << " " << (d_a1) / (((do
             };
           };
         };
-        
-       av_m2[k] /= ((double)q_int); 
         
        };
     
@@ -1303,7 +1280,7 @@ std::cout << " Number of accepted steps : h : " << d_a1 << " " << (d_a1) / (((do
             
       for(l=0;l<length;l++) {
       
-          J_coupling[k][l] = J_coupling[k][l] - (av_k2[k]*av_l2[l])/av_kl2;
+          if(av_kl2 > 0.0) J_coupling[k][l] = J_coupling[k][l] - (av_k2[k]*av_l2[l])/av_kl2;
           
       };
     };
@@ -1333,7 +1310,7 @@ std::cout << " Number of accepted steps : h : " << d_a1 << " " << (d_a1) / (((do
               
             for(m=0;m<length;m++) {
                 
-                    V_coupling[k][l][m] = J_coupling[k][l]*J_coupling[k][m]*J_coupling[l][m]/(av_m2[k]*av_m2[l]*av_m2[m]);
+                    if(av_m3[k] > 0.0 & av_m3[l] > 0.0 && av_m3[m] > 0.0) V_coupling[k][l][m] = J_coupling[k][l]*J_coupling[k][m]*J_coupling[l][m]/(av_m3[k]*av_m3[l]*av_m3[m]);
                     
                     av_k2[k] += V_coupling[k][l][m]/((double)(length*length));
                     av_l2[l] += V_coupling[k][l][m]/((double)(length*length));
@@ -1351,7 +1328,7 @@ std::cout << " Number of accepted steps : h : " << d_a1 << " " << (d_a1) / (((do
             
             for(m=0;m<length;m++) {          
     
-              V_coupling[k][l][m] = V_coupling[k][l][m] - (av_k2[k]*av_l2[l]*av_m2[m])/av_kl2;
+              if(av_kl2 > 0.0) V_coupling[k][l][m] = V_coupling[k][l][m] - (av_k2[k]*av_l2[l]*av_m2[m])/av_kl2;
               
             };
         };
@@ -1369,14 +1346,52 @@ std::cout << " Number of accepted steps : h : " << d_a1 << " " << (d_a1) / (((do
         }
     }
     
-    r = 0;
-    r2 = 0;
-    
     double buff_J1,buff_J2;
     int    buff_k1,buff_k2;
     int    buff_l1,buff_l2;
     int    buff_m1,buff_m2;
-    
+
+    int *k_index;
+    int *l_index;
+    double *J_index;
+
+
+    int *k_index2;
+    int *l_index2;
+    int *m_index2;
+    double *V_index;
+
+    int r,r2;
+
+    r = 0;
+    r2 = 0;
+
+    for(k=0;k<length;k++) {
+
+       for(l=k;l<length;l++) {
+
+	     r ++;
+
+         for(m=l;m<length;m++) {
+
+	     r2 ++;
+	 }
+       }
+    }  
+
+    k_index = (int *) malloc(sizeof(int)*((r+2)));
+    l_index = (int *) malloc(sizeof(int)*((r+2)));
+    J_index = (double *) malloc(sizeof(double)*((r+2)));
+
+    k_index2 = (int *) malloc(sizeof(int)*((r2+2)));
+    l_index2 = (int *) malloc(sizeof(int)*((r2+2)));
+    m_index2 = (int *) malloc(sizeof(int)*((r2+2)));
+    V_index  = (double *) malloc(sizeof(double)*((r2+2)));
+
+
+    r = 0;
+    r2 = 0;
+
     for(k=0;k<length;k++) {
         
         for(l=k;l<length;l++) {
@@ -1405,11 +1420,7 @@ std::cout << " Number of accepted steps : h : " << d_a1 << " " << (d_a1) / (((do
     
    Quicksort(J_index,k_index,l_index,0,r);
    Quicksort2(V_index,k_index2,l_index2,m_index2,0,r2);    
-        
-    std::ofstream outfile,contact_file;
-    
-    contact_file.open("contact_ij.dat");
-  
+   
     n = 1;
   
      for(k=0;k<=r;k++) {
@@ -1418,12 +1429,6 @@ std::cout << " Number of accepted steps : h : " << d_a1 << " " << (d_a1) / (((do
          
         fprintf(fp,"%d\t%d\t%15.25e\n",k_index[k]+1,l_index[k]+1,J_index[k]);       
         
-        if(n <= maxcontact) {
-        
-            contact_file << std::setw(5) << k_index[k] << " " << std::setw(5) << l_index[k] << "\n";         
-            
-            n++;
-        };
        }; 
      };
     
@@ -1435,12 +1440,18 @@ std::cout << " Number of accepted steps : h : " << d_a1 << " " << (d_a1) / (((do
            
        };
      };
-         
+    
+   free(k_index);
+   free(l_index);
+   free(J_index);
+   free(k_index2);
+   free(l_index2);
+   free(m_index2);
+   free(V_index);
+
     fprintf(fp,"\n");
     fprintf(fp2,"\n");    
      
-    contact_file.close();
-    
  };
 }
     

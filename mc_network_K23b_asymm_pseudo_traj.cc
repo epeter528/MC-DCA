@@ -197,6 +197,8 @@ int main(int argc, char **argv) {
     
     double reg_J, reg_H;
 
+    FILE *fp, *fp2;
+
     n = 0;
     
   std::default_random_engine generator;
@@ -250,9 +252,10 @@ int main(int argc, char **argv) {
             };
          }; 
       };
-      
-    //  return 0;
-      
+   
+    fp = fopen("DI_ij.dat","w");
+    fp2 = fopen("DI_ijk.dat","w");
+
     // Initialize MSA Vector
     
       std::cout << n << " Number of lines " << std::endl;
@@ -482,32 +485,44 @@ int main(int argc, char **argv) {
            };
        
         weight[i] = id2/((double)(length*number_of_sequences));
-        
+       
        };
     //  Sequence_vector.clear();
      
+
 double B_eff,mean,max = 0.0,min=1000.0;
-      
+double *m_a;
+
+m_a = (double *) malloc(sizeof(double)*number_of_sequences);
+
 B_eff = 0.0;
 mean  = 0.0;
-      
+     
 for(i=0;i<number_of_sequences;i++) {
 
-  if(weight[i] < 0.8) {  
+ if(weight[i] <= 0.8) m_a[i] = 1.0;	
+
+  for(j=0;j<number_of_sequences;j++) {	
  
-     weight[i] = 1.0;	  
-	 
-  } else {
-  
-     weight[i] = weight[i]*((double)(length));
-     weight[i] = 1.0/weight[i];
-     
-  };
+    if(i != j) {
+
+      if(weight[j] > 0.8 && weight[i] > 0.8) {
+      
+	 m_a[i] += 1.0;    
+
+      }
+    }
+  }
+}
+
+for(i=0;i<number_of_sequences;i++) {
+
+    weight[i] = 1.0/m_a[i];
 
     B_eff     += weight[i];
           
 };
-      
+     
 double **delta_E_N; 
 
 std::cout << "Average over sequences " << std::endl;
@@ -879,28 +894,23 @@ for(k=0;k<length;k++) {
             
 for(i=1;i<number_of_sequences;i++) {  
     
- if(excluded[i] == 0) {   
-    
      for(k=0;k<length;k++) {  
     
        for(n=1;n<=q_int;n++) { 
 
-         if(i==1) f1[k][n] *= weight[i]/(B_eff + 0.5);	       
-         if(msa_vec_d[i][k][n] != msa_vec_d[i-1][k][n]) f1[k][n] += weight[i]/(B_eff + 0.5)*1.0/(B_eff + 0.5);  
+         if(msa_vec_d[i][k][n] != msa_vec_d[i-1][k][n]) f1[k][n] += weight[i]/(B_eff + 0.5);  
           
          for(l=0;l<length;l++) {  
         
            for(n2=1;n2<=q_int;n2++) {
                     
-		if(i==1) f12[k][l][n][n2] *= weight[i]/pow(B_eff + 0.5,1);   
-                if(msa_vec_d[i][k][n] != msa_vec_d[i-1][k][n] && msa_vec_d[i][l][n2] != msa_vec_d[i-1][l][n2]) f12[k][l][n][n2] += weight[i]/pow(B_eff + 0.5,1)*1.0/(B_eff + 0.5);  
+                if(msa_vec_d[i][k][n] != msa_vec_d[i-1][k][n] && msa_vec_d[i][l][n2] != msa_vec_d[i-1][l][n2]) f12[k][l][n][n2] += weight[i]/pow(B_eff + 0.5,1);  
                 
 
              };
            };
          };   
        };  
-      };
 };
 
 double ran;
@@ -947,226 +957,36 @@ double ran2,ran3,*delta_E,**energy1,**energy2;
 //stepsize_H /= (double)(number_mc);
 //stepsize_J /= (double)(number_mc);
 
+double **a1,**a2;
 
-for (n1 = 1; n1 <= number_mc ; n1 ++) {   
-  
-if(n1 == 1) {
- 
-  for(k=0;k<length;k++) {  
-   for(n=1;n<=q_int;n++) {
-       
-    shift1[k][n] = f1[k][n]; 
-    accept_1[k][n] = 1.0;
-       
-    for(l=0;l<length;l++) {  
-     for(n2=1;n2<=q_int;n2++) {  
-         
-         shift12[k][l][n][n2] = f12[k][l][n][n2];
-         accept_2[k][l][n][n2] = 1.0;
-         
-     };
-    };
-   };
-  };
-  
-  count_reseed = 1.0;
-  
-};    
-    
-if(n1%reseed_interval == 0) {
-   
- // std::uniform_real_distribution<double> distribution(0.0,1.0);  
-     
-//#pragma omp parallel for schedule(dynamic)     
-    
-  for(k=0;k<length;k++) {  
-   for(n=1;n<=q_int;n++) {
-       
-    shift1[k][n] += h[k][n];
-       
-    for(l=0;l<length;l++) {  
-     for(n2=1;n2<=q_int;n2++) {  
-         
-         shift12[k][l][n][n2] += J[k][l][n][n2];
-         
-     };
-    };
-   };
-  };
-  
-  count_reseed += 1.0;
-  
- };   
+a1 = (double **) malloc(sizeof(double)*(length+1));
 
-  Z1 = 0.0;
-  Z2 = 0.0;  
-  
-  for(k=0;k<length;k++) {  
-      
-   for(n=1;n<=q_int;n++) {  
-       
-      ran = distribution(generator);    
-      
-      state[k][n] = (ran-0.5)*((h[k][n]))*stepsize_H; //+ (ran2 - 0.5)*h[k][n])*stepsize_H;
-      
-      prob[k][n]      = h[k][n]; //+ state[k][n];
-      
-      delta_h2[k][n]  = h[k][n] + state[k][n];
-      
-     // delta_E_N[k][n] = (h[k][n] + state[k][n]);
-      
-      for(l=0;l<length;l++) {  
-        
-         for(n2=1;n2<=q_int;n2++) {      
-         
-          ran = distribution(generator);
-         
-          state_2[k][l][n][n2] = (ran-0.5)*(((J[k][l][n][n2])))*stepsize_J; //+ (ran2-0.5)*h[k][n]*h[l][n2])))*stepsize_J;
-         
-          delta_J2[k][l][n][n2] = (J[k][l][n][n2] + state_2[k][l][n][n2]);
-          
-          prob[k][n]           += J[k][l][n][n2];//delta_J2[k][l][n][n2];
-          
-          delta_h2[k][n]       += J[k][l][n][n2] + state_2[k][l][n][n2];
-          
-        }; 
-       };
-       
-       Z1 += exp((prob[k][n]));
-       Z2 += exp((delta_h2[k][n]));
-       
-      };
-    };
-    
-//#pragma omp parallel for schedule(dynamic)     
-   
-  double delta_prob,Z3,Z4;  
-
-  double **a1,**a2;
-
-  a1 = (double **) malloc(sizeof(double)*(length+1));
-
-  for(k=0;k<length;k++) {
+for(k=0;k<length;k++) {
   
      a1[k] = (double *) malloc(sizeof(double)*(q_int+1));
 
-  }
+}
 
-  a2 = (double **) malloc(sizeof(double)*(length+1));
+a2 = (double **) malloc(sizeof(double)*(length+1));
 
-  for(k=0;k<length;k++) {
+for(k=0;k<length;k++) {
 
      a2[k] = (double *) malloc(sizeof(double)*(q_int+1));
 
-  }
+}
 
-  
-  Z3 = 0.0;
-  Z4 = 0.0;
-
-  for(k=0;k<length;k++) {
-
-   for(n=1;n<=q_int;n++) {
-
-      a1[k][n] = (sqrt(pow(1.0/Z1*(exp(prob[k][n])) - f1[k][n],2)));
-      a2[k][n] = (sqrt(pow(1.0/Z2*(exp(delta_h2[k][n])) - f1[k][n],2)));
-
-       for(l=0;l<length;l++) {
-
-         for(n2=1;n2<=q_int;n2++) {
-
-             a1[k][n] += sqrt(pow(1.0/(Z1*Z1)*(exp(prob[k][n])*Z1 - exp(prob[l][n2])*exp(prob[k][n])) - 1.0/pow(Z1,2)*exp(prob[l][n2])*exp(prob[k][n]) - f12[k][l][n][n2],2));
-             a2[k][n] += sqrt(pow(1.0/(Z2*Z2)*(exp(delta_h2[l][n2])*Z2 - exp(delta_h2[l][n2])*exp(delta_h2[k][n])) - 1.0/pow(Z2,2)*exp(delta_h2[l][n2])*exp(delta_h2[k][n]) - f12[k][l][n][n2],2));
-	 }
-       }
-
-    Z3 += exp(-a1[k][n]/temperature);
-    Z4 += exp(-a2[k][n]/temperature);
-
-   }
-  }
-  
-  for(k=0;k<length;k++) {  
-
-   for(n=1;n<=q_int;n++) {
-
-   // printf("%lg\n",1.0/(Z2*temperature)*exp(state[k][n]/temperature));
+    double *av_k2,*av_l2;
     
-   // Z2 = Z1 - exp(prob[k][n]) + exp(delta_h2[k][n]); 
-      
-    delta_prob = exp(-(sqrt(pow(1.0/(Z2)*
-                       exp(delta_h2[k][n]) - f1[k][n],2))
-                     - sqrt(pow(1.0/Z1*exp(prob[k][n]) - f1[k][n],2)))/temperature)*Z3/Z4*exp(-sqrt(pow(state[k][n],2)));
-       
-    ran = distribution(generator); 
+    double *av_k3,*av_l3,*av_m3;
     
-    if(ran <= delta_prob) { //- reg_H*h[k][n]/accept_1[k][n])) {
-             
-             h[k][n] += state[k][n];
-         
-             accept_1[k][n] += 1.0;
-         
-       for(l=0;l<length;l++) {  
-        
-         for(n2=1;n2<=q_int;n2++) { 
-           
-        //   delta_prob = exp(-(sqrt(pow(1.0/(Z1 - exp(prob[l][n2]) + exp(delta_h2[l][n2]))*
-        //   exp(delta_h2[l][n2]) + 1.0/(Z1 - exp(prob[k][n]) + exp(delta_h2[k][n]))*
-        //   exp(delta_h2[k][n])*1.0/(Z1 - exp(prob[l][n2]) + exp(delta_h2[l][n2]))*exp(delta_h2[l][n2]) 
-        //   + reg_J*(J[k][l][n][n2] + state_2[k][l][n][n2]) - f12[k][l][n][n2],2)) - 
-        //   sqrt(pow(1.0/Z1*exp(prob[l][n2]) + 1.0/Z1*exp(prob[k][n])*1.0/Z1*exp(prob[l][n2]) 
-        //   + reg_J*J[k][l][n][n2] - f12[k][l][n][n2],2)))/temperature);
-          
-           delta_prob = exp(-(sqrt(pow(1.0/(Z2*Z2)*(exp(delta_h2[l][n2])*Z2 - exp(delta_h2[l][n2])*exp(delta_h2[k][n])) - 1.0/pow(Z2,2)*exp(delta_h2[l][n2])*exp(delta_h2[k][n]) - f12[k][l][n][n2],2)) - 
-           sqrt(pow(1.0/(Z1*Z1)*(exp(prob[k][n])*Z1 - exp(prob[l][n2])*exp(prob[k][n])) - 1.0/pow(Z1,2)*exp(prob[l][n2])*exp(prob[k][n]) - f12[k][l][n][n2],2)))/temperature)*Z3/Z4*exp(-sqrt(pow(state_2[k][l][n][n2],2)));
+    av_k2 = (double *) malloc(sizeof(double)*(length+1));
+    av_l2 = (double *) malloc(sizeof(double)*(length+1));
 
 
-           ran = distribution(generator); 
-           
-           if(ran <= delta_prob)  { 
-                
-                J[k][l][n][n2] += state_2[k][l][n][n2];
-       
-                accept_2[k][l][n][n2] += 1.0;
-          
-         };
-        };
-       };
-     };
-    };
-   };
- 
- std::cout << n1 << " mc-steps " << std::endl; 
+    av_k3 = (double *) malloc(sizeof(double)*(length+1));
+    av_l3 = (double *) malloc(sizeof(double)*(length+1));    
+    av_m3 = (double *) malloc(sizeof(double)*(length+1));  
     
-};      
-
-double d_a1,d_a2;
-
-d_a1 = 0.0;
-d_a2 = 0.0;
-
-for(k=0;k<length;k++) {  
-
-   for(n=1;n<=q_int;n++) { 
-       
-      d_a1 += accept_1[k][n];
-      
-      for(l=0;l<length;l++) {  
-        
-         for(n2=1;n2<=q_int;n2++) {  
-             
-            d_a2 += accept_2[k][l][n][n2];
-            
-         };
-      };
-   };
-}; 
-
-double d_n = ((d_a1) / (((double)(length*q_int*number_mc))) + (d_a2)/(double)(length*q_int*length*q_int*number_mc))/2.0;
-
-std::cout << " Number of accepted steps : h : " << d_a1 << " " << (d_a1) / (((double)(length*q_int*number_mc))) 
-<< " J : " << d_a2 << " " << (d_a2)/(double)(length*q_int*length*q_int*number_mc) << " Fraction : " << d_n << std::endl;
-
 double ***V_coupling;
      
 V_coupling = (double ***) malloc(sizeof(double)*(length+1));
@@ -1227,14 +1047,214 @@ double **av_kl;
         
          av_kl[k] = (double *) malloc(sizeof(double)*(length+1));
          
-      };    
-    
-    n2 = 0;
- 
+      };  
+      
     double *av_m2;
     
-    av_m2 = (double *) malloc(sizeof(double)*(length+1));    
+    av_m2 = (double *) malloc(sizeof(double)*(length+1));  
     
+    int *k_index;
+    int *l_index;
+    double *J_index;
+    
+    
+    int *k_index2;
+    int *l_index2;
+    int *m_index2;
+    double *V_index;    
+    
+    int r,r2;
+    
+    k_index = (int *) malloc(sizeof(int)*((length+1)*(length+1)));
+    l_index = (int *) malloc(sizeof(int)*((length+1)*(length+1)));    
+    J_index = (double *) malloc(sizeof(double)*((length+1)*(length+1)));  
+    
+    k_index2 = (int *) malloc(sizeof(int)*((length+1)*(length+1)*(length+1)));
+    l_index2 = (int *) malloc(sizeof(int)*((length+1)*(length+1)*(length+1)));    
+    m_index2 = (int *) malloc(sizeof(int)*((length+1)*(length+1)*(length+1)));
+    V_index  = (double *) malloc(sizeof(double)*((length+1)*(length+1)*(length+1)));      
+
+
+for (n1 = 1; n1 <= number_mc ; n1 ++) {   
+
+if(n1 == 1) {      	
+	
+  for(k=0;k<length;k++) {  
+   for(n=1;n<=q_int;n++) {
+       
+    accept_1[k][n] = 0.0;
+       
+    for(l=0;l<length;l++) {  
+     for(n2=1;n2<=q_int;n2++) {  
+         
+         accept_2[k][l][n][n2] = 0.0;
+         
+     };
+    };
+   };
+  };  
+};    
+    
+  Z1 = 0.0;
+  Z2 = 0.0;  
+  
+  for(k=0;k<length;k++) {  
+      
+   for(n=1;n<=q_int;n++) {  
+       
+      ran = distribution(generator);    
+
+   //   state[k][n] = ((ran - 0.5)*(h[k][n] - f1[k][n] + 1.0/(0.5+B_eff)))*stepsize_H;
+
+      state[k][n] = f1[k][n] + ((ran-0.5)*f1[k][n])*stepsize_H;
+
+      prob[k][n]      = h[k][n]; 
+      
+      delta_h2[k][n]  = state[k][n];
+      
+      for(l=0;l<length;l++) {  
+        
+         for(n2=1;n2<=q_int;n2++) {      
+         
+          ran = distribution(generator);
+
+    //      state_2[k][l][n][n2] = ((ran - 0.5)*(J[k][l][n][n2] - f12[k][l][n][n2] + 1.0/(0.5+B_eff)) - 
+    //		  (ran - 0.5)*((h[k][n] - f1[k][n] + 1.0/(0.5+B_eff))*(h[l][n2] - f1[l][n2] + 1.0/(0.5+B_eff))))*stepsize_J;
+
+          state_2[k][l][n][n2] = f12[k][l][n][n2] + (ran-0.5)*(f12[k][l][n][n2])*stepsize_J;
+
+          delta_J2[k][l][n][n2] = (J[k][l][n][n2] + state_2[k][l][n][n2]);
+          
+          prob[k][n]           += J[k][l][n][n2];
+          
+          delta_h2[k][n]       += state_2[k][l][n][n2];
+          
+        }; 
+       };
+       
+       Z1 += exp((prob[k][n]));
+       Z2 += exp((delta_h2[k][n]));
+       
+      };
+    };
+    
+//#pragma omp parallel for schedule(dynamic)     
+   
+  double delta_prob,Z3,Z4;  
+  
+  Z3 = 0.0;
+  Z4 = 0.0;
+
+  for(k=0;k<length;k++) {
+
+   for(n=1;n<=q_int;n++) {
+
+      a1[k][n] = (sqrt(pow(1.0/Z1*(exp(prob[k][n])) - f1[k][n],2)));
+      a2[k][n] = (sqrt(pow(1.0/Z2*(exp(delta_h2[k][n])) - f1[k][n],2)));
+
+       for(l=0;l<length;l++) {
+
+         for(n2=1;n2<=q_int;n2++) {
+
+             a1[k][n] += sqrt(pow(1.0/(Z1)*(exp(prob[l][n2])*exp(prob[k][n])) + 1.0/pow(Z1,2)*exp(prob[l][n2])*exp(prob[k][n]) - f12[k][l][n][n2],2));
+             a2[k][n] += sqrt(pow(1.0/(Z2)*(exp(delta_h2[l][n2])*exp(delta_h2[k][n])) + 1.0/pow(Z2,2)*exp(delta_h2[l][n2])*exp(delta_h2[k][n]) - f12[k][l][n][n2],2));
+	     }
+       }
+
+    Z3 += exp(-a1[k][n]/temperature);
+    Z4 += exp(-a2[k][n]/temperature);
+
+   }
+  }
+  
+  for(k=0;k<length;k++) {  
+
+   for(n=1;n<=q_int;n++) {
+
+   // printf("%lg\n",1.0/(Z2*temperature)*exp(state[k][n]/temperature));
+    
+   // Z2 = Z1 - exp(prob[k][n]) + exp(delta_h2[k][n]); 
+      
+    delta_prob = exp(-(sqrt(pow(1.0/(Z2)*
+                       exp(delta_h2[k][n]) - f1[k][n],2))
+                     - sqrt(pow(1.0/Z1*exp(prob[k][n]) - f1[k][n],2)))/temperature)*Z3/Z4*exp(((state[k][n] - h[k][n])/temperature));
+       
+    ran = distribution(generator); 
+    
+    if(ran <= delta_prob) { //- reg_H*h[k][n]/accept_1[k][n])) {
+             
+             h[k][n] = state[k][n];
+         
+             accept_1[k][n] += 1.0;
+         
+       for(l=0;l<length;l++) {  
+        
+         for(n2=1;n2<=q_int;n2++) { 
+           
+           delta_prob = exp(-(sqrt(pow(1.0/(Z2)*(exp(delta_h2[l][n2])*exp(delta_h2[k][n])) + 1.0/pow(Z2,2)*exp(delta_h2[l][n2])*exp(delta_h2[k][n]) - f12[k][l][n][n2],2)) - 
+           sqrt(pow(1.0/(Z1)*(exp(prob[l][n2])*exp(prob[k][n])) + 1.0/pow(Z1,2)*exp(prob[l][n2])*exp(prob[k][n]) - f12[k][l][n][n2],2)))/temperature)*Z3/Z4*exp(((state_2[k][l][n][n2] - J[k][l][n][n2]))/temperature);
+
+           ran = distribution(generator); 
+           
+           if(ran <= delta_prob)  { 
+                
+                J[k][l][n][n2] = state_2[k][l][n][n2];
+              //  h[k][n]        += state[k][n]*state[l][n2];
+	      //  h[l][n2]       += state[k][n]*state[l][n2];
+
+                accept_2[k][l][n][n2] += 1.0;
+          
+         };
+        };
+       };
+     };
+    };
+   };
+ 
+ if(n1%1000 == 0) 
+     
+ {
+
+     std::cout << n1 << " mc-steps " << std::endl; 
+
+double d_a1,d_a2;
+
+d_a1 = 0.0;
+d_a2 = 0.0;
+
+for(k=0;k<length;k++) {  
+
+   for(n=1;n<=q_int;n++) { 
+       
+      d_a1 += accept_1[k][n];
+      
+      for(l=0;l<length;l++) {  
+        
+         for(n2=1;n2<=q_int;n2++) {  
+             
+            d_a2 += accept_2[k][l][n][n2];
+            
+         };
+      };
+   };
+}; 
+
+double d_n = ((d_a1) / (((double)(length*q_int*n1))) + (d_a2)/(double)(length*q_int*length*q_int*n1))/2.0;
+
+std::cout << " Number of accepted steps : h : " << d_a1 << " " << (d_a1) / (((double)(length*q_int*n1))) 
+<< " J : " << d_a2 << " " << (d_a2)/(double)(length*q_int*length*q_int*n1) << " Fraction : " << d_n << std::endl;
+
+    n2 = 0;
+
+    for(k=0;k<length;k++) {
+    
+	for(l=0;l<length;l++) {
+	
+            J_coupling[k][l] = 0.0;		
+
+	};    
+    };
+
     for(k=0;k<length;k++) {
         
       av_m2[k] = 0.0;   
@@ -1259,20 +1279,15 @@ double **av_kl;
         
        };
     
-    double *av_k2,*av_l2;
-    
-    double *av_k3,*av_l3,*av_m3;
-    
     double av_kl2=0.0,av_kl3=0.0;   
     
-    av_k2 = (double *) malloc(sizeof(double)*(length+1));
-    av_l2 = (double *) malloc(sizeof(double)*(length+1));
-
-
-    av_k3 = (double *) malloc(sizeof(double)*(length+1));
-    av_l3 = (double *) malloc(sizeof(double)*(length+1));    
-    av_m3 = (double *) malloc(sizeof(double)*(length+1));
+    for(k=0;k<length;k++) {
     
+	av_k2[k] = 0.0;
+        av_l2[k] = 0.0;	
+    
+    }
+
     for(k=0;k<length;k++) {
             
       for(l=0;l<length;l++) {
@@ -1303,15 +1318,19 @@ double **av_kl;
     };  
     
     av_kl2 = 0.0;
-    
+   
+    for(k=0;k<length;k++) {
+
+	av_k2[k] = 0.0;
+        av_l2[k] = 0.0;
+        av_m2[k] = 0.0;	
+
+    }
+
     for(k=0;k<length;k++) {   
-        
-        av_k2[k] = 0.0;
         
         for(l=0;l<length;l++) {
               
-            av_l2[l] = 0.0;
-            
             for(m=0;m<length;m++) {
                 
                     V_coupling[k][l][m] = J_coupling[k][l]*J_coupling[k][m]*J_coupling[l][m]/(av_m2[k]*av_m2[l]*av_m2[m]);
@@ -1350,29 +1369,8 @@ double **av_kl;
         }
     }
     
-    int *k_index;
-    int *l_index;
-    double *J_index;
-    
-    
-    int *k_index2;
-    int *l_index2;
-    int *m_index2;
-    double *V_index;    
-    
-    int r,r2;
-    
     r = 0;
     r2 = 0;
-    
-    k_index = (int *) malloc(sizeof(int)*((length+1)*(length+1)));
-    l_index = (int *) malloc(sizeof(int)*((length+1)*(length+1)));    
-    J_index = (double *) malloc(sizeof(double)*((length+1)*(length+1)));  
-    
-    k_index2 = (int *) malloc(sizeof(int)*((length+1)*(length+1)*(length+1)));
-    l_index2 = (int *) malloc(sizeof(int)*((length+1)*(length+1)*(length+1)));    
-    m_index2 = (int *) malloc(sizeof(int)*((length+1)*(length+1)*(length+1)));
-    V_index  = (double *) malloc(sizeof(double)*((length+1)*(length+1)*(length+1)));
     
     double buff_J1,buff_J2;
     int    buff_k1,buff_k2;
@@ -1414,9 +1412,6 @@ double **av_kl;
   
     n = 1;
   
-    FILE *fp = fopen("DI_ij.dat","w");    
-    FILE *fp2 = fopen("DI_ijk.dat","w"); 
-    
      for(k=0;k<=r;k++) {
      
        if(k_index[k] != l_index[k]) {  
@@ -1441,10 +1436,16 @@ double **av_kl;
        };
      };
          
-    fclose(fp); 
-    fclose(fp2);
+    fprintf(fp,"\n");
+    fprintf(fp2,"\n");    
+     
     contact_file.close();
     
+ };
+}
+    
     std::cout << " finalized " << std::endl; 
-      
+    
+    fclose(fp);
+    fclose(fp2);
 }

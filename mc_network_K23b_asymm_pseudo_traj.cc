@@ -957,7 +957,7 @@ double ran2,ran3,*delta_E,**energy1,**energy2;
 //stepsize_H /= (double)(number_mc);
 //stepsize_J /= (double)(number_mc);
 
-double **a1,**a2;
+double **a1,**a2,**a3,**a4;
 
 a1 = (double **) malloc(sizeof(double)*(length+1));
 
@@ -974,6 +974,23 @@ for(k=0;k<length;k++) {
      a2[k] = (double *) malloc(sizeof(double)*(q_int+1));
 
 }
+
+a3 = (double **) malloc(sizeof(double)*(length+1));
+
+for(k=0;k<length;k++) {
+
+     a3[k] = (double *) malloc(sizeof(double)*(q_int+1));
+
+}
+
+a4 = (double **) malloc(sizeof(double)*(length+1));
+
+for(k=0;k<length;k++) {
+
+     a4[k] = (double *) malloc(sizeof(double)*(q_int+1));
+
+}
+
 
     double *av_k2,*av_l2;
     
@@ -1120,9 +1137,12 @@ if(n1 == 1) {
 //#pragma omp parallel for schedule(dynamic)     
    
   double delta_prob,Z3,Z4;  
-  
+  double Z5,Z6; 
+
   Z3 = 0.0;
   Z4 = 0.0;
+  Z5 = 0.0;
+  Z6 = 0.0;
 
   for(k=0;k<length;k++) {
 
@@ -1130,18 +1150,25 @@ if(n1 == 1) {
 
       a1[k][n] = (sqrt(pow(1.0/Z1*(exp(prob[k][n])) - f1[k][n],2)));
       a2[k][n] = (sqrt(pow(1.0/Z2*(exp(delta_h2[k][n])) - f1[k][n],2)));
+      a3[k][n] = h[k][n];
+      a4[k][n] = state[k][n];     
 
        for(l=0;l<length;l++) {
 
          for(n2=1;n2<=q_int;n2++) {
 
              a1[k][n] += sqrt(pow(1.0/(Z1)*(exp(prob[l][n2])*exp(prob[k][n])) + 1.0/pow(Z1,2)*exp(prob[l][n2])*exp(prob[k][n]) - f12[k][l][n][n2],2));
-             a2[k][n] += sqrt(pow(1.0/(Z2)*(exp(delta_h2[l][n2])*exp(delta_h2[k][n])) + 1.0/pow(Z2,2)*exp(delta_h2[l][n2])*exp(delta_h2[k][n]) - f12[k][l][n][n2],2));
-	     }
+	     a2[k][n] += sqrt(pow(1.0/(Z2)*(exp(delta_h2[l][n2])*exp(delta_h2[k][n])) + 1.0/pow(Z2,2)*exp(delta_h2[l][n2])*exp(delta_h2[k][n]) - f12[k][l][n][n2],2));
+             a3[k][n] += J[k][l][n][n2];
+	     a4[k][n] += state_2[k][l][n][n2];
+
+	 }
        }
 
     Z3 += exp(-a1[k][n]/temperature);
     Z4 += exp(-a2[k][n]/temperature);
+    Z5 += exp(a3[k][n]/temperature);
+    Z6 += exp(a4[k][n]/temperature);
 
    }
   }
@@ -1156,7 +1183,7 @@ if(n1 == 1) {
       
     delta_prob = exp(-(sqrt(pow(1.0/(Z2)*
                        exp(delta_h2[k][n]) - f1[k][n],2))
-                     - sqrt(pow(1.0/Z1*exp(prob[k][n]) - f1[k][n],2)))/temperature)*Z3/Z4*exp(((state[k][n] - h[k][n])/temperature));
+                     - sqrt(pow(1.0/Z1*exp(prob[k][n]) - f1[k][n],2)))/temperature)*Z3/Z4*Z5/Z6*exp(((state[k][n] - h[k][n])/temperature));
        
     ran = distribution(generator); 
     
@@ -1171,7 +1198,7 @@ if(n1 == 1) {
          for(n2=1;n2<=q_int;n2++) { 
            
            delta_prob = exp(-(sqrt(pow(1.0/(Z2)*(exp(delta_h2[l][n2])*exp(delta_h2[k][n])) + 1.0/pow(Z2,2)*exp(delta_h2[l][n2])*exp(delta_h2[k][n]) - f12[k][l][n][n2],2)) - 
-           sqrt(pow(1.0/(Z1)*(exp(prob[l][n2])*exp(prob[k][n])) + 1.0/pow(Z1,2)*exp(prob[l][n2])*exp(prob[k][n]) - f12[k][l][n][n2],2)))/temperature)*Z3/Z4*exp(((state_2[k][l][n][n2] - J[k][l][n][n2]))/temperature);
+           sqrt(pow(1.0/(Z1)*(exp(prob[l][n2])*exp(prob[k][n])) + 1.0/pow(Z1,2)*exp(prob[l][n2])*exp(prob[k][n]) - f12[k][l][n][n2],2)))/temperature)*Z3/Z4*Z5/Z6*exp(((state_2[k][l][n][n2] - J[k][l][n][n2]))/temperature);
 
            ran = distribution(generator); 
            
